@@ -84,7 +84,16 @@ Paddle rpaddle;
 
 // __switchSign takes a double by reference and switches it from
 // positive to negative and vise versa.  Written in Assembly
-extern "C" double switchSign (double switchme);
+void __switchSign (double & switchme)
+{
+	double sign = -1.0;
+	__asm {
+	         movsd xmm0, switchme
+			 movsd xmm1, sign
+			 mulsd xmm0,xmm1
+			 movsd switchme, xmm0
+		  };
+} 
 
 // This function calculates the magnitude of the spin and
 // sets spinning to true
@@ -111,27 +120,92 @@ double randomy()
 
 void playpong()
 {
-	lpaddle.y = wMousey;   // <-- TO DO: rewrite simple operations like this into __asm
+	// Get the elapsedTime for smooth animation on different machines
 	const double MAX_ELAPSED = 0.04;
     double currTime = glutGet(GLUT_ELAPSED_TIME)/1000.;
     double elapsedTime = currTime - oldTime;
     if (elapsedTime > MAX_ELAPSED)
         elapsedTime = MAX_ELAPSED;
     oldTime = currTime;
-   
-	// Also the movement of the ponball will be redone in __asm
+	const double scaler = 5.0;
 	pongball.x += (5*difficulty*pongball.vx)*elapsedTime;
 	pongball.y += (5*difficulty*pongball.vy)*elapsedTime;
-
+	// Start of Assembly language!
+	__asm{
+			movsd xmm0, wMousey     // lpaddle.y = wMousey 
+			movsd lpaddle.y, xmm0   //
+	};   
+   		/*pongball.x += (5*difficulty*pongball.vx)*elapsedTime;
+			movsd xmm0, pongball.x
+			movsd xmm1, elapsedTime
+			mulsd xmm0, xmm1
+			movsd xmm1, pongball.vx
+			mulsd xmm0, xmm1
+			movsd xmm1, difficulty
+			mulsd xmm0, xmm1
+			movsd xmm1, scaler
+			mulsd xmm0, xmm1
+			addsd xmm0, pongball.x
+			movsd pongball.x, xmm0
+		//pongball.y += (5*difficulty*pongball.vy)*elapsedTime;
+			movsd xmm0, pongball.y
+			movsd xmm1, elapsedTime
+			mulsd xmm0, xmm1
+			movsd xmm1, pongball.vy
+			mulsd xmm0, xmm1
+			movsd xmm1, difficulty
+			mulsd xmm0, xmm1
+			movsd xmm1, scaler
+			mulsd xmm0, xmm1
+			addsd xmm0, pongball.y
+			movsd pongball.y, xmm0
+		 };*/
 	//AI
 	if (pongball.x > 0)
 	{
-		if (pongball.y > rpaddle.y)
-			rpaddle.y += difficulty*elapsedTime;
-		if (pongball.y < rpaddle.y)
-			rpaddle.y -= difficulty*elapsedTime;
-	}
+	__asm{
+			/*movsd xmm0, pongball.x
+			xorpd xmm1, xmm1
+			ucomisd xmm0, xmm1
+			jg AI
+			jmp endAI
+			AI: */
+				movsd xmm0, pongball.y
+				movsd xmm1, rpaddle.y
+				ucomisd xmm0, xmm1
+				jg MoveUp
+				ucomisd xmm0, xmm1
+				jl MoveDown
+				jmp endAI
+				
+				MoveUp:
+					movsd xmm0, rpaddle.y
+					movsd xmm1, difficulty
+					movsd xmm2, elapsedTime
+					mulsd xmm1,xmm2
+					addsd xmm0, xmm1
+					movsd rpaddle.y, xmm0
+					jmp endAI
+				
+				MoveDown:
+					movsd xmm0, rpaddle.y
+					movsd xmm1, difficulty
+					movsd xmm2, elapsedTime
+					mulsd xmm1,xmm2
+					subsd xmm0, xmm1
+					movsd rpaddle.y, xmm0
+					jmp endAI
+				
+			endAI:
 
+
+	//{
+	//	if (pongball.y > rpaddle.y)
+	//		rpaddle.y += difficulty*elapsedTime;
+	//	if (pongball.y < rpaddle.y)
+	//		rpaddle.y -= difficulty*elapsedTime;
+	};
+	}
 	// speed check
 	if (pongball.vx > pongball.vxmax && pongball.vx > 0)
 		pongball.vx = pongball.vxmax;
@@ -163,8 +237,7 @@ void playpong()
 		if (pongball.y > wWintop)
 		{
 			pongball.y = wWintop - (pongball.y - wWintop);
-			//pongball.vy = -pongball.vy;  
-			switchSign (pongball.vy);
+			__switchSign (pongball.vy);
 			
 			if (spinning)
 			{  // this function needs some work.
@@ -187,7 +260,7 @@ void playpong()
 	{
 		if (pongball.y < wWinbottom)
 		{
-			pongball.vy = -pongball.vy;
+			__switchSign(pongball.vy);
 			pongball.y = wWinbottom - (pongball.y - wWinbottom);
 			if (spinning){
 				if (spin < 0 )
